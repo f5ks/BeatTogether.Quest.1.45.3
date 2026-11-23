@@ -12,18 +12,11 @@ namespace {
     using namespace GlobalNamespace;
     using namespace LiteNetLib::Utils;
     using IdentityPacket = PlayerIdentityPacket_1<BeatSaberPlayerIdentityPacketData>;
-
-    bool UsesLegacyLobbyPackets() {
-        const auto* server = MultiplayerCore::API::GetCurrentServer();
-        return server && (server->graphUrl == Config::defaultGraphUrl ||
-            (server->graphUrl.ends_with('/') &&
-             std::string_view(server->graphUrl).substr(0, server->graphUrl.size() - 1) == Config::defaultGraphUrl));
-    }
 }
 
 MAKE_AUTO_HOOK_MATCH(PlayerConnectedPacket_Deserialize, &PlayerConnectedPacket::Deserialize,
     void, PlayerConnectedPacket* self, NetDataReader* reader) {
-    if (!UsesLegacyLobbyPackets()) {
+    if (!UsesBeatTogetherLegacyServer()) {
         PlayerConnectedPacket_Deserialize(self, reader);
         return;
     }
@@ -38,7 +31,7 @@ MAKE_AUTO_HOOK_MATCH(PlayerConnectedPacket_Deserialize, &PlayerConnectedPacket::
 MAKE_AUTO_HOOK_FIND_VERBOSE(PlayerIdentityPacket_Serialize,
     (i2c::find_method(i2c::class_of<IdentityPacket*>(), {"Serialize", {}, {i2c::type_of<NetDataWriter*>()}})),
     void, IdentityPacket* self, NetDataWriter* writer, const MethodInfo* method) {
-    if (!UsesLegacyLobbyPackets()) {
+    if (!UsesBeatTogetherLegacyServer()) {
         PlayerIdentityPacket_Serialize(self, writer, method);
         return;
     }
@@ -53,7 +46,7 @@ MAKE_AUTO_HOOK_FIND_VERBOSE(PlayerIdentityPacket_Serialize,
 MAKE_AUTO_HOOK_FIND_VERBOSE(PlayerIdentityPacket_Deserialize,
     (i2c::find_method(i2c::class_of<IdentityPacket*>(), {"Deserialize", {}, {i2c::type_of<NetDataReader*>()}})),
     void, IdentityPacket* self, NetDataReader* reader, const MethodInfo* method) {
-    if (!UsesLegacyLobbyPackets()) {
+    if (!UsesBeatTogetherLegacyServer()) {
         PlayerIdentityPacket_Deserialize(self, reader, method);
         return;
     }

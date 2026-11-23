@@ -30,5 +30,6 @@ struct Config {
 
 extern Config config;
 
+bool UsesBeatTogetherLegacyServer();
 bool LoadConfig();
 void SaveConfig();

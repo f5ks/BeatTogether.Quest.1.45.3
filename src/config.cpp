@@ -7,6 +7,15 @@
 extern modloader::ModInfo modInfo;
 Config config;
 
+bool UsesBeatTogetherLegacyServer() {
+    const auto* server = MultiplayerCore::API::GetCurrentServer();
+    if (!server) return false;
+
+    std::string_view url = server->graphUrl;
+    if (url.ends_with('/')) url.remove_suffix(1);
+    return url == Config::defaultGraphUrl;
+}
+
 std::string get_configPath() {
     return get_config_path(modInfo);
 }
