@@ -2,6 +2,7 @@
 
 #include "multiplayer-core/shared/MultiplayerCore.hpp"
 #include <string>
+#include <string_view>
 #include <map>
 
 #ifndef MAX_PLAYER_COUNT
@@ -9,6 +10,7 @@
 #endif
 
 struct Config {
+    static constexpr std::string_view defaultGraphUrl = "http://master.beattogether.systems:8989";
 #if defined(SERVER_NAME)
     std::string selectedServer = SERVER_NAME;
 #else
@@ -16,7 +18,7 @@ struct Config {
 #endif
     std::string officialServerName = "Official Servers";
     std::map<std::string, MultiplayerCore::ServerConfig> servers = std::map<std::string, MultiplayerCore::ServerConfig>({
-        {"BeatTogether", {"http://master.beattogether.systems:8989", "http://master.beattogether.systems/status", MAX_PLAYER_COUNT, "", true}},
+        {"BeatTogether", {std::string(defaultGraphUrl), "http://master.beattogether.systems/status", MAX_PLAYER_COUNT, "", true}},
         #if defined(GRAPH_URL) && defined(STATUS_URL) && defined(SERVER_NAME)
         {SERVER_NAME, {GRAPH_URL, STATUS_URL, MAX_PLAYER_COUNT, "", true}},
         #endif
