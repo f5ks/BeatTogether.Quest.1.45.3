@@ -103,11 +103,11 @@ namespace BeatTogether::UI {
         screenT->set_position(pos);
         _screen->get_gameObject()->SetActive(true);
 
-        if (il2cpp_utils::try_cast<GlobalNamespace::MultiplayerModeSelectionViewController>(oldViewController).has_value())
+        if (i2c::try_cast<GlobalNamespace::MultiplayerModeSelectionViewController*>(oldViewController))
             SetInteraction(false);
-        if (il2cpp_utils::try_cast<GlobalNamespace::MultiplayerModeSelectionViewController>(newViewController).has_value() || il2cpp_utils::try_cast<GlobalNamespace::ConnectionErrorDialogViewController>(newViewController).has_value())
+        if (i2c::try_cast<GlobalNamespace::MultiplayerModeSelectionViewController*>(newViewController) || i2c::try_cast<GlobalNamespace::ConnectionErrorDialogViewController*>(newViewController))
             SetInteraction(true);
-        if (il2cpp_utils::try_cast<GlobalNamespace::JoiningLobbyViewController>(newViewController).has_value() && animationType == HMUI::ViewController::AnimationType::None)
+        if (i2c::try_cast<GlobalNamespace::JoiningLobbyViewController*>(newViewController) && animationType == HMUI::ViewController::AnimationType::None)
             return false;
         return true;
     }

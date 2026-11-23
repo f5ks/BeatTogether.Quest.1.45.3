@@ -16,8 +16,8 @@ project(${COMPILE_ID})
 include(${EXTERN_DIR}/includes/kaleb/shared/cmake/assets.cmake)
 
 # c++ standard
-set(CMAKE_CXX_STANDARD 20)
-set(CMAKE_CXX_STANDARD_REQUIRED 20)
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS TRUE)
 
 # define that stores the actual source directory
@@ -47,8 +47,6 @@ endif()
 file(GLOB_RECURSE cpp_file_list ${SOURCE_DIR}/*.cpp)
 file(GLOB_RECURSE c_file_list ${SOURCE_DIR}/*.c)
 
-file(GLOB_RECURSE inline_hook_c ${EXTERN_DIR}/includes/beatsaber-hook/shared/inline-hook/*.c)
-file(GLOB_RECURSE inline_hook_cpp ${EXTERN_DIR}/includes/beatsaber-hook/shared/inline-hook/*.cpp)
 
 # add all src files to compile
 add_library(
@@ -56,8 +54,6 @@ add_library(
         SHARED
         ${cpp_file_list}
         ${c_file_list}
-        ${inline_hook_c}
-        ${inline_hook_cpp}
 )
 
 target_include_directories(${COMPILE_ID} PRIVATE .)

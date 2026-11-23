@@ -1,12 +1,14 @@
 #pragma once
 
+#include <unordered_set>
+
+#include "scotland2/shared/loader.hpp"
+#include "beatsaber-hook/shared/listw.hpp"
 #include "custom-types/shared/macros.hpp"
 #include "lapiz/shared/macros.hpp"
 
 #include "bsml/shared/BSML/Components/Settings/ListSetting.hpp"
 #include "bsml/shared/BSML/FloatingScreen/FloatingScreen.hpp"
-
-#include "multiplayer-core/shared/Models/MpStatusData.hpp"
 
 #include "Zenject/IInitializable.hpp"
 #include "System/IDisposable.hpp"

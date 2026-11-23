@@ -1,13 +1,14 @@
+#include "scotland2/shared/loader.hpp"
 #include "config.hpp"
 #include "logging.hpp"
-#include "beatsaber-hook/shared/config/config-utils.hpp"
+#include "beatsaber-hook/shared/rapidjson.hpp"
+#include "beatsaber-hook/shared/utils.hpp"
 
 extern modloader::ModInfo modInfo;
 Config config;
 
 std::string get_configPath() {
-    auto path = Configuration::getConfigFilePath(modInfo);
-    return path.replace(path.length() - 4, 4, "json");
+    return get_config_path(modInfo);
 }
 
 void SaveConfig() {
