@@ -10,17 +10,10 @@
 #include "GlobalNamespace/INetworkConfig.hpp"
 #include "GlobalNamespace/MultiplayerPlacementErrorCodeMethods.hpp"
 #include "GlobalNamespace/NetworkUtility.hpp"
-#include "GlobalNamespace/PlatformAuthenticationTokenProvider.hpp"
 #include "Newtonsoft/Json/Formatting.hpp"
 #include "Newtonsoft/Json/JsonConvert.hpp"
 #include "Newtonsoft/Json/Linq/JObject.hpp"
 #include "Newtonsoft/Json/Linq/JValue.hpp"
-#include "Oculus/Platform/Core.hpp"
-#include "Oculus/Platform/Message_1.hpp"
-#include "Oculus/Platform/Models/Error.hpp"
-#include "Oculus/Platform/Models/UserProof.hpp"
-#include "Oculus/Platform/Request_1.hpp"
-#include "Oculus/Platform/Users.hpp"
 #include "System/Net/Http/HttpClient.hpp"
 #include "System/Net/Http/HttpClientHandler.hpp"
 #include "System/Net/Http/HttpResponseMessage.hpp"
@@ -35,8 +28,6 @@
 #include "UnityEngine/Application.hpp"
 #include "beatsaber-hook/shared/safeptr.hpp"
 #include "beatsaber-hook/shared/threading.hpp"
-#include "bsml/shared/BSML/MainThreadScheduler.hpp"
-#include "custom-types/shared/delegate.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -51,8 +42,6 @@ namespace {
     using namespace System::Threading::Tasks;
 
     using SessionSource = TaskCompletionSource_1<PlayerSessionInfo*>;
-    using ProofSource = TaskCompletionSource_1<StringW>;
-    using ProofMessage = Oculus::Platform::Message_1<Oculus::Platform::Models::UserProof*>;
 
     // Dispose managed resources on the attached worker, including on a failed or canceled request.
     constexpr auto dispose = [](auto* resource) noexcept {
@@ -61,49 +50,6 @@ namespace {
     constexpr auto disposeClient = [](HttpClient* client) noexcept {
         dispose(static_cast<HttpMessageInvoker*>(client));
     };
-
-    StringW RequestProof(CancellationToken cancellationToken) {
-        auto completion = safe_ptr(ProofSource::New_ctor(TaskCreationOptions::RunContinuationsAsynchronously));
-        auto cancellation = safe_ptr(cancellationToken._source);
-        BSML::MainThreadScheduler::Schedule([completion, cancellation] {
-            try {
-                if (CancellationToken(cancellation.unchecked_ptr()).IsCancellationRequested ||
-                    !Oculus::Platform::Core::IsInitialized()) {
-                    completion->TrySetResult(nullptr);
-                    return;
-                }
-
-                auto request = Oculus::Platform::Users::GetUserProof();
-                if (!request) {
-                    completion->TrySetResult(nullptr);
-                    return;
-                }
-
-                request->OnComplete(custom_types::MakeDelegate<ProofMessage::Callback*>(
-                    std::function<void(ProofMessage*)>([completion](ProofMessage* message) {
-                        try {
-                            if (message && !message->get_IsError()) {
-                                auto proof = message->get_Data();
-                                completion->TrySetResult(proof ? proof->Value : nullptr);
-                                return;
-                            }
-                            const auto error = message ? message->GetError() : nullptr;
-                            WARNING("BeatTogether Meta proof request failed, SDK code {}", error ? error->Code : -1);
-                        } catch (...) {
-                            WARNING("Could not read the BeatTogether Meta proof response");
-                        }
-                        completion->TrySetResult(nullptr);
-                    })
-                ));
-            } catch (...) {
-                WARNING("Could not start the BeatTogether Meta proof request");
-                completion->TrySetResult(nullptr);
-            }
-        });
-
-        auto task = completion->get_Task();
-        return task->Wait(10000, cancellationToken) ? task->get_Result() : nullptr;
-    }
 
     void PlaceLegacyLobby(SessionSource* result, System::Object* request, StringW authUserId,
                           CancellationToken callerToken) {
@@ -121,7 +67,7 @@ namespace {
             body->set_Item(StringW("auth_user_id"), JValue::New_ctor(authUserId));
 
             while (!token.IsCancellationRequested) {
-                const auto proof = RequestProof(token);
+                const auto proof = MultiplayerCore::API::RequestQuestUserProof(token);
                 if (System::String::IsNullOrEmpty(proof)) {
                     result->TrySetException(ConnectionFailedException::New_ctor(ConnectionFailedReason::AuthenticationFailed));
                     return;
@@ -194,13 +140,13 @@ MAKE_AUTO_HOOK_MATCH(GameLiftPlayerSessionProvider_LegacyPlacement, &GameLiftPla
     auto result = safe_ptr(SessionSource::New_ctor(TaskCreationOptions::RunContinuationsAsynchronously));
     auto task = result->get_Task();
     try {
-        const auto provider = i2c::try_cast<PlatformAuthenticationTokenProvider*>(authenticationTokenProvider);
-        if (!provider || System::String::IsNullOrEmpty(provider->_userId)) {
+        const auto questUserId = MultiplayerCore::API::GetQuestAuthenticationUserId(authenticationTokenProvider);
+        if (System::String::IsNullOrEmpty(questUserId)) {
             result->TrySetException(ConnectionFailedException::New_ctor(ConnectionFailedReason::AuthenticationFailed));
             return task;
         }
 
-        const auto authUserId = safe_ptr<StringW>(provider->_userId);
+        const auto authUserId = safe_ptr<StringW>(questUserId);
         if (System::String::IsNullOrEmpty(userId)) {
             userId = NetworkUtility::GetHashBase64(StringW("OculusQuest#" + static_cast<std::string>(authUserId.ptr())));
         }

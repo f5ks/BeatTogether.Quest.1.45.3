@@ -6,7 +6,7 @@
   "info": {
     "name": "BeatTogether",
     "id": "BeatTogether",
-    "version": "2.2.5",
+    "version": "2.2.6",
     "url": "https://github.com/BeatTogether/BeatTogether.Quest",
     "additionalData": {
       "overrideSoName": "libBeatTogether.so",
@@ -60,7 +60,7 @@
     },
     {
       "id": "multiplayer-core",
-      "versionRange": "=1.7.0",
+      "versionRange": "=1.7.1",
       "additionalData": {
         "includeQmod": false
       }

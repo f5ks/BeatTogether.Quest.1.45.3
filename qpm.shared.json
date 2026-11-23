@@ -7,7 +7,7 @@
     "info": {
       "name": "BeatTogether",
       "id": "BeatTogether",
-      "version": "2.2.5",
+      "version": "2.2.6",
       "url": "https://github.com/BeatTogether/BeatTogether.Quest",
       "additionalData": {
         "overrideSoName": "libBeatTogether.so",
@@ -61,7 +61,7 @@
       },
       {
         "id": "multiplayer-core",
-        "versionRange": "=1.7.0",
+        "versionRange": "=1.7.1",
         "additionalData": {
           "includeQmod": false
         }
@@ -190,13 +190,13 @@
     {
       "dependency": {
         "id": "multiplayer-core",
-        "versionRange": "=1.7.0",
+        "versionRange": "=1.7.1",
         "additionalData": {
           "overrideSoName": "libMultiplayerCore.so",
           "cmake": true
         }
       },
-      "version": "1.7.0"
+      "version": "1.7.1"
     },
     {
       "dependency": {
