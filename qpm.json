@@ -61,7 +61,9 @@
     {
       "id": "multiplayer-core",
       "versionRange": "=1.7.0",
-      "additionalData": {}
+      "additionalData": {
+        "includeQmod": false
+      }
     },
     {
       "id": "scotland2",
