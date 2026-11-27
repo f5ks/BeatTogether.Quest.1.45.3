@@ -14,6 +14,11 @@
 #include "Newtonsoft/Json/JsonConvert.hpp"
 #include "Newtonsoft/Json/Linq/JObject.hpp"
 #include "Newtonsoft/Json/Linq/JValue.hpp"
+#include "Oculus/Platform/Core.hpp"
+#include "Oculus/Platform/Entitlements.hpp"
+#include "Oculus/Platform/Message.hpp"
+#include "Oculus/Platform/Models/Error.hpp"
+#include "Oculus/Platform/Request.hpp"
 #include "System/Net/Http/HttpClient.hpp"
 #include "System/Net/Http/HttpClientHandler.hpp"
 #include "System/Net/Http/HttpResponseMessage.hpp"
@@ -28,6 +33,8 @@
 #include "UnityEngine/Application.hpp"
 #include "beatsaber-hook/shared/safeptr.hpp"
 #include "beatsaber-hook/shared/threading.hpp"
+#include "bsml/shared/BSML/MainThreadScheduler.hpp"
+#include "custom-types/shared/delegate.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -42,6 +49,38 @@ namespace {
     using namespace System::Threading::Tasks;
 
     using SessionSource = TaskCompletionSource_1<PlayerSessionInfo*>;
+    using EntitlementSource = TaskCompletionSource_1<bool>;
+
+    // This credential belongs to BeatTogether's legacy compatibility mode.
+    constexpr auto legacyQuestCredential = "who_is_rem_?";
+
+    bool CheckLegacyQuestEntitlement(CancellationToken token) {
+        using namespace Oculus::Platform;
+        const auto completion = safe_ptr(EntitlementSource::New_ctor(TaskCreationOptions::RunContinuationsAsynchronously));
+        const auto cancellation = safe_ptr(token._source);
+        BSML::MainThreadScheduler::Schedule([completion, cancellation] {
+            try {
+                if (CancellationToken(cancellation.unchecked_ptr()).IsCancellationRequested || !Core::IsInitialized()) {
+                    completion->TrySetResult(false);
+                    return;
+                }
+                const auto request = Entitlements::IsUserEntitledToApplication();
+                if (!request) {
+                    completion->TrySetResult(false);
+                    return;
+                }
+                request->OnComplete(custom_types::MakeDelegate<Message::Callback*>(
+                    std::function<void(Message*)>([completion](Message* reply) {
+                        const bool entitled = reply && !reply->get_IsError();
+                        completion->TrySetResult(entitled);
+                    })));
+            } catch (...) {
+                completion->TrySetResult(false);
+            }
+        });
+        const auto task = completion->get_Task();
+        return task->Wait(10000, token) && task->get_Result();
+    }
 
     // Dispose managed resources on the attached worker, including on a failed or canceled request.
     constexpr auto dispose = [](auto* resource) noexcept {
@@ -53,11 +92,12 @@ namespace {
 
     void PlaceLegacyLobby(SessionSource* result, System::Object* request, StringW authUserId,
                           CancellationToken callerToken) {
+        auto token = callerToken;
         try {
             const std::unique_ptr<CancellationTokenSource, decltype(dispose)> deadline(
                 CancellationTokenSource::CreateLinkedTokenSource(callerToken));
             deadline->CancelAfter(GameLiftPlayerSessionProvider::kMatchmakingTimeoutMs);
-            auto token = deadline->get_Token();
+            token = deadline->get_Token();
             const auto handler = HttpClientHandler::New_ctor();
             handler->set_AllowAutoRedirect(false);
             const std::unique_ptr<HttpClient, decltype(disposeClient)> client(HttpClient::New_ctor(handler));
@@ -66,14 +106,25 @@ namespace {
             const auto body = JObject::Parse(JsonConvert::SerializeObject(request));
             body->set_Item(StringW("auth_user_id"), JValue::New_ctor(authUserId));
 
+            bool entitlementConfirmed = false;
             while (!token.IsCancellationRequested) {
-                const auto proof = MultiplayerCore::API::RequestQuestUserProof(token);
-                if (System::String::IsNullOrEmpty(proof)) {
-                    result->TrySetException(ConnectionFailedException::New_ctor(ConnectionFailedReason::AuthenticationFailed));
-                    return;
+                auto credential = MultiplayerCore::API::RequestQuestUserProof(token);
+                if (token.IsCancellationRequested) break;
+                if (System::String::IsNullOrEmpty(credential)) {
+                    if (!entitlementConfirmed) {
+                        entitlementConfirmed = CheckLegacyQuestEntitlement(token);
+                        if (token.IsCancellationRequested) break;
+                        if (!entitlementConfirmed) {
+                            WARNING("Meta proof unavailable and Quest entitlement was not confirmed");
+                            result->TrySetException(ConnectionFailedException::New_ctor(ConnectionFailedReason::AuthenticationFailed));
+                            return;
+                        }
+                        INFO("Meta proof unavailable; using BeatTogether legacy Quest authentication after entitlement passed");
+                    }
+                    credential = StringW(legacyQuestCredential);
                 }
 
-                body->set_Item(StringW("single_use_auth_token"), JValue::New_ctor(proof));
+                body->set_Item(StringW("single_use_auth_token"), JValue::New_ctor(credential));
                 const std::unique_ptr<StringContent, decltype(dispose)> content(StringContent::New_ctor(
                     body->ToString(Formatting::None, nullptr), System::Text::Encoding::get_UTF8(), StringW("application/json")));
                 INFO("Requesting a lobby using the legacy BeatTogether placement API");
@@ -119,6 +170,8 @@ namespace {
         } catch (...) {
             if (callerToken.IsCancellationRequested) {
                 result->TrySetCanceled(callerToken);
+            } else if (token.IsCancellationRequested) {
+                result->TrySetException(ConnectionFailedException::New_ctor(ConnectionFailedReason::Timeout));
             } else {
                 WARNING("The BeatTogether legacy placement request could not complete");
                 result->TrySetException(ConnectionFailedException::New_ctor(ConnectionFailedReason::MultiplayerApiUnreachable));
